@@ -1,9 +1,12 @@
-import socket
-import sock
+from sock import *
 
-addr = ('127.0.0.1', 8888)
-client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-client.connect(addr)
 
-sock_ = sock.sock_client(client)
-print(sock_.rsa_public_key)
+class MySockClient(sock_client):
+    def run(self):
+        print(self.recv())
+        self.client.close()
+
+if __name__ == '__main__':
+    server_address = ('localhost', 8888)
+    client = MySockClient(server_address)
+    client.run()

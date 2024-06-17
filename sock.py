@@ -22,14 +22,15 @@ aes encrypt
 '''
 def aes_encrypt(key, data: bytes):
     cipher = AES.new(key[0], AES.MODE_CBC, key[1])
-    return cipher.encrypt(data)
+    return cipher.encrypt(pad(data, AES.block_size))
 
 '''
 aes decrypt
 '''
 def aes_decrypt(key, data):
     decipher = AES.new(key[0], AES.MODE_CBC, key[1])
-    return decipher.decrypt(data)
+    decrypted_data = decipher.decrypt(data)
+    return unpad(decrypted_data, AES.block_size)
 
 '''
 rsa encrypt
@@ -60,12 +61,18 @@ class SockServerInterface(ABC):
     def run(self, client: socket.socket):
         pass
 
+class SockClientInterface(ABC):
+    @abstractmethod
+    def run(self):
+        pass
+
 class sock_server(SockServerInterface):
     '''
     generate rsa and aes key in server
     '''
     def __init__(self, addr) -> None:
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         server.bind(addr)
         server.listen()
         self.server = server
@@ -101,19 +108,21 @@ class sock_server(SockServerInterface):
     '''
     def recv_aes_key(self):
         head_len = unpack_number(self.client.recv(4, socket.MSG_WAITALL))
-
         encrypted_aes_key = self.client.recv(head_len, socket.MSG_WAITALL)
-
-        decrypted_aes_key = rsa.decrypt(pickle.loads(encrypted_aes_key), self.rsa_key[1])
-
-        self.aes_key = pickle.loads(decrypted_aes_key)
+        decrypted_aes_key_bytes = rsa.decrypt(encrypted_aes_key, self.rsa_key[1])
+        self.aes_key = pickle.loads(decrypted_aes_key_bytes)
     
     def send(self,client: socket.socket, data: dict):
         data_bytes = pickle.dumps(data)
         en_data = aes_encrypt(self.aes_key, data_bytes)
-        self.
+        client.send(pack_number(len(en_data)))
+        client.send(en_data)
+    
+    def recv(self, client: socket.socket):
+        len_data = unpack_number(client.recv(4, socket.MSG_WAITALL))
+        return pickle.loads(aes_decrypt(self.aes_key, client.recv(len_data, socket.MSG_WAITALL)))
 
-class sock_client(object):
+class sock_client(SockClientInterface):
     def __init__(self, addr) -> None:
         client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client.connect(addr)
@@ -135,3 +144,19 @@ class sock_client(object):
         encrypted_aes_key = rsa_encrypt(self.rsa_public_key, pickle.dumps(self.aes_key))
         self.client.send(pack_number(len(encrypted_aes_key)))
         self.client.send(encrypted_aes_key)
+    
+    def send(self, data: dict):
+        data_bytes = pickle.dumps(data)
+        en_data = aes_encrypt(self.aes_key, data_bytes)
+        self.client.send(pack_number(len(en_data)))
+        self.client.send(en_data)
+    
+    def recv(self):
+        len_data = unpack_number(self.client.recv(4, socket.MSG_WAITALL))
+        return pickle.loads(aes_decrypt(self.aes_key, self.client.recv(len_data, socket.MSG_WAITALL)))
+    
+    '''
+    This method should be overridden by the user
+    '''
+    def run(self):
+        pass

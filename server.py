@@ -1,18 +1,14 @@
-import socket
-import sock
+from sock import *
 
-host = "0.0.0.0"
-port = 8888
+class MySockServer(sock_server):
+    def run(self, client: socket.socket):
+        self.send(client, {"name": "abu"})
+        client.close()
 
-server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) 
-server.bind((host, port))
-print(f'server listen on {host}:{port}.....')
-server.listen()
+if __name__ == '__main__':
+    server_address = ('localhost', 8888)
+    server = MySockServer(server_address)
 
-client, addr = server.accept()
-sock_ = sock.sock_server(client)
-client.close()
-server.close()
+
 
 
